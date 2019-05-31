@@ -27,3 +27,5 @@ migrate:
 
 shell:
 	python manage.py shell --settings=config.local
+database:
+	python make-database.py
