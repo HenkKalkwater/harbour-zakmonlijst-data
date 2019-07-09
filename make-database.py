@@ -70,6 +70,12 @@ c.execute('''CREATE TABLE IF NOT EXISTS versions (
                 identifier          TEXT NOT NULL)''');
 logd(" - Created versions table");
 
+# Evolution triggers
+c.execute('''CREATE TABLE IF NOT EXISTS evolution_triggers (
+				id					INTEGER PRIMARY KEY,
+				identifier			TEXT NOT NULL) ''')
+logd(" - Created evolution triggers table")
+
 # Version Names
 c.execute('''CREATE TABLE IF NOT EXISTS version_names (
                 version_id          INTEGER NOT NULL,
@@ -159,6 +165,43 @@ c.execute('''CREATE TABLE IF NOT EXISTS evolution_chains (
                 baby_trigger_item_id    INTEGER)''')
                 # Missing foreign key reference to items
 logd(" - Created evolution_chains table");
+
+# Pokémon evolution
+c.execute('''CREATE TABLE IF NOT EXISTS pokemon_evolution (
+				id					INTEGER PRIMARY KEY,
+				evolved_species_id	INTEGER NOT NULL,
+				evolution_trigger_id	INTEGER NOT NULL,
+				trigger_item_id		INTEGER NOT NULL,
+				minimum_level		INTEGER,
+				gender_id			INTEGER,
+				location_id			INTEGER,
+				held_item_id		INTEGER,
+				time_of_day			STRING,
+				known_move_id		INTEGER,
+				known_move_type_id	INTEGER,
+				minimum_happiness	INTEGER,
+				minimum_beauty		INTEGER,
+				minimum_affection	INTEGER,
+				relative_physical_stats	INTEGER,
+				party_species_id	INTEGER,
+				party_type_id		INTEGER,
+				trade_species_id	INTEGER,
+				needs_overworld_rain	INTEGER,
+				turn_upside_down	INTEGER,
+				FOREIGN KEY(evolved_species_id) REFERENCES pokemon_species(id),
+				FOREIGN KEY(evolution_trigger_id) REFERENCES evolution_triggers(id))''')
+#TODO: add more foreign keys
+logd(" - Created pokemon evolution table")
+
+# Evolution trigger prose
+c.execute('''CREATE TABLE IF NOT EXISTS evolution_trigger_prose (
+				evolution_trigger_id	INTEGER NOT NULL,
+				local_language_id		INTEGER NOT NULL,
+				name					TEXT NOT NULL,
+				FOREIGN KEY(evolution_trigger_id) REFERENCES evolution_triggers(id),
+				FOREIGN KEY(local_language_id) REFERENCES languages(id),
+				PRIMARY KEY(evolution_trigger_id, local_language_id))''')
+logd(" - Created pokemon evolution trigger prose table")
 
 # Species
 c.execute('''CREATE TABLE IF NOT EXISTS pokemon_species (
@@ -282,6 +325,9 @@ fill_table("pokemon_types", ("pokemon_id", "type_id", "slot"), "pokemon_types.cs
 fill_table("pokemon_species_flavor_text", ("species_id", "version_id", "language_id", "flavor_text"), "pokemon_species_flavor_text.csv")
 fill_table("pokedex_prose", ("pokedex_id", "local_language_id", "name", "description"), "pokedex_prose.csv")
 fill_table("pokemon_dex_numbers", ("species_id", "pokedex_id", "pokedex_number"), "pokemon_dex_numbers.csv")
+fill_table("evolution_triggers", ("id", "identifier"), "evolution_triggers.csv")
+fill_table("pokemon_evolution", ("id", "evolved_species_id", "evolution_trigger_id", "trigger_item_id", "minimum_level", "gender_id", "location_id", "held_item_id", "time_of_day", "known_move_id", "known_move_type_id", "minimum_happiness", "minimum_beauty", "minimum_affection", "relative_physical_stats", "party_species_id", "party_type_id", "trade_species_id", "needs_overworld_rain", "turn_upside_down"), "pokemon_evolution.csv")
+fill_table("evolution_trigger_prose", ("evolution_trigger_id", "local_language_id", "name"), "evolution_trigger_prose.csv")
 logd("Done")
 con.commit()
 con.close()
