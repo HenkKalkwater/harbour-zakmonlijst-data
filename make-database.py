@@ -95,6 +95,15 @@ c.execute('''CREATE TABLE IF NOT EXISTS generations (
                 FOREIGN KEY(main_region_id) REFERENCES regions(id))''');
 logd(" - Created generations table")
 
+# Version version_groups
+c.execute('''CREATE TABLE IF NOT EXISTS version_groups (
+				id					INTEGER PRIMARY KEY,
+				identifier			TEXT NOT NULL,
+				generation_id		INTEGER NOT NULL,
+				"order"				INTEGER,
+				FOREIGN KEY(generation_id) REFERENCES generations(id))''')
+logd(" - Created version_groups table")
+
 # Types
 c.execute('''CREATE TABLE IF NOT EXISTS types (
                 id                  INTEGER PRIMARY KEY,
@@ -328,6 +337,7 @@ fill_table("pokemon_dex_numbers", ("species_id", "pokedex_id", "pokedex_number")
 fill_table("evolution_triggers", ("id", "identifier"), "evolution_triggers.csv")
 fill_table("pokemon_evolution", ("id", "evolved_species_id", "evolution_trigger_id", "trigger_item_id", "minimum_level", "gender_id", "location_id", "held_item_id", "time_of_day", "known_move_id", "known_move_type_id", "minimum_happiness", "minimum_beauty", "minimum_affection", "relative_physical_stats", "party_species_id", "party_type_id", "trade_species_id", "needs_overworld_rain", "turn_upside_down"), "pokemon_evolution.csv")
 fill_table("evolution_trigger_prose", ("evolution_trigger_id", "local_language_id", "name"), "evolution_trigger_prose.csv")
+fill_table("version_groups", ("id", "identifier", "generation_id", "order"), "version_groups.csv")
 logd("Done")
 con.commit()
 con.close()
