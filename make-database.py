@@ -6,6 +6,8 @@ import os
 import sqlite3
 import sys
 
+DB_VERSION = 1
+
 parser = argparse.ArgumentParser(description="Generate the SQLITE database from the PokéApi files");
 parser.add_argument("-o", "--output", help="The location of the generated SQLite database", default="database.sqlite");
 parser.add_argument("-v", "--verbose", help="Make the output verbose", action="store_true");
@@ -33,8 +35,11 @@ con = sqlite3.connect(args.output);
 # TABLE CREATION                                                                                   #
 ####################################################################################################
 
-logd("Creating tables...")
+logd("Setting version")
 c = con.cursor();
+c.execute(f"PRAGMA user_version = {DB_VERSION}")
+
+logd("Creating tables...")
 
 # Languages
 c.execute('''CREATE TABLE IF NOT EXISTS languages (
@@ -291,6 +296,65 @@ c.execute('''CREATE TABLE IF NOT EXISTS pokemon_species_flavor_text (
                 PRIMARY KEY(species_id, version_id, language_id))''');
 logd(" - Created pokemon_species_flavor_text table")
 
+c.execute('''CREATE TABLE IF NOT EXISTS pokemon_move_methods (
+				id					INTEGER PRIMARY KEY,
+				identifier			TEXT NOT NULL) ''')
+
+logd(" - Created pokemon_move_methods table")
+c.execute('''CREATE TABLE IF NOT EXISTS pokemon_move_method_prose (
+				pokemon_move_method_id	INTEGER NOT NULL,
+				local_language_id		INTEGER NOT NULL,
+				name					TEXT,
+				description				TEXT,
+				FOREIGN KEY(pokemon_move_method_id) REFERENCES pokemon_move_methods(id),
+				FOREIGN KEY(local_language_id) REFERENCES languages(id)
+				PRIMARY KEY(pokemon_move_method_id, local_language_id))''')
+
+logd(" - Created pokemon_move_method_prose table")
+
+c.execute('''CREATE TABLE IF NOT EXISTS move_names (
+				move_id					INTEGER NOT NULL,
+				local_language_id		INTEGER NOT NULL,
+				name					TEXT NOT NULL,
+				FOREIGN KEY(move_id) REFERENCES moves(id),
+				FOREIGN KEY(local_language_id) REFERENCES languages(id),
+				PRIMARY KEY(move_id, local_language_id))''')
+
+logd(" - Create move_names table")
+
+c.execute('''CREATE TABLE IF NOT EXISTS moves (
+				id					INTEGER PRIMARY KEY,
+				identifier			TEXT NOT NULL,
+				generation_id		INTEGER NOT NULL,
+				type_id				INTEGER NOT NULL,
+				power				INTEGER,
+				pp					INTEGER NOT NULL,
+				accuracy			INTEGER,
+				priority			INTEGER NOT NULL,
+				target_id			INTEGER NOT NULL,
+				damage_class_id		INTEGER NOT NULL,
+				effect_id			INTEGER NOT NULL,
+				effect_chance		INTEGER,
+				contest_type_id		INTEGER,
+				contest_effect_id	INTEGER,
+				super_contest_effect_id	INTEGER,
+				FOREIGN KEY(generation_id) REFERENCES generations(id),
+				FOREIGN KEY(type_id) REFERENCES types(id))''')
+
+logd("- Created moves table")
+
+c.execute('''CREATE TABLE IF NOT EXISTS pokemon_moves (
+				pokemon_id			INTEGER NOT NULL,
+				version_group_id	INTEGER NOT NULL,
+				move_id				INTEGER NOT NULL,
+				pokemon_move_method_id	INTEGER NOT NULL,
+				level				INTEGER NOT NULL,
+				"order"				INTEGER,
+				FOREIGN KEY(pokemon_id) REFERENCES pokemon(id),
+				FOREIGN KEY(version_group_id) REFERENCES version_groups(id),
+				FOREIGN KEY(move_id) REFERENCES moves(id))''')
+logd(" - Created pokemon_moves")
+
 
 ####################################################################################################
 # TABLE FILLING                                                                                    #
@@ -338,6 +402,11 @@ fill_table("evolution_triggers", ("id", "identifier"), "evolution_triggers.csv")
 fill_table("pokemon_evolution", ("id", "evolved_species_id", "evolution_trigger_id", "trigger_item_id", "minimum_level", "gender_id", "location_id", "held_item_id", "time_of_day", "known_move_id", "known_move_type_id", "minimum_happiness", "minimum_beauty", "minimum_affection", "relative_physical_stats", "party_species_id", "party_type_id", "trade_species_id", "needs_overworld_rain", "turn_upside_down"), "pokemon_evolution.csv")
 fill_table("evolution_trigger_prose", ("evolution_trigger_id", "local_language_id", "name"), "evolution_trigger_prose.csv")
 fill_table("version_groups", ("id", "identifier", "generation_id", "order"), "version_groups.csv")
+fill_table("pokemon_move_methods", ("id", "identifier"), "pokemon_move_methods.csv")
+fill_table("pokemon_move_method_prose", ("pokemon_move_method_id", "local_language_id", "name", "description"), "pokemon_move_method_prose.csv")
+fill_table("move_names", ("move_id", "local_language_id", "name"), "move_names.csv")
+fill_table("moves", ("id", "identifier", "generation_id", "type_id", "power", "pp", "accuracy", "priority", "target_id", "damage_class_id", "effect_id", "effect_chance", "contest_type_id", "contest_effect_id", "super_contest_effect_id"), "moves.csv")
+fill_table("pokemon_moves", ("pokemon_id", "version_group_id", "move_id", "pokemon_move_method_id", "level", "order"), "pokemon_moves.csv")
 logd("Done")
 con.commit()
 con.close()
