@@ -3,6 +3,7 @@
 import argparse
 import csv
 import os
+import re
 import sqlite3
 import sys
 
@@ -29,6 +30,7 @@ except OSError:
     logd(f"Created {args.output}")
 
 con = sqlite3.connect(args.output);
+con.row_factory = sqlite3.Row
 
 
 ####################################################################################################
@@ -108,6 +110,26 @@ c.execute('''CREATE TABLE IF NOT EXISTS version_groups (
 				"order"				INTEGER,
 				FOREIGN KEY(generation_id) REFERENCES generations(id))''')
 logd(" - Created version_groups table")
+
+# Items
+c.execute('''CREATE TABLE IF NOT EXISTS items (
+				id					INTEGER PRIMARY KEY,
+				identifier			TEXT NOT NULL,
+				category_id			INTEGER_NOT_NULL,
+				cost				INTEGER,
+				fling_power			INTEGER,
+				fling_effect_id		INTEGER
+			)''')
+logd(" - Created items table")
+
+# Item names
+c.execute('''CREATE TABLE IF NOT EXISTS item_names (
+				item_id					INTEGER NOT NULL,
+				local_language_id	INTEGER NOT NULL,
+				name				TEXT,
+				PRIMARY KEY(item_id, local_language_id),
+				FOREIGN KEY(local_language_id) REFERENCES languages(id)
+			)''')
 
 # Types
 c.execute('''CREATE TABLE IF NOT EXISTS types (
@@ -341,7 +363,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS moves (
 				FOREIGN KEY(generation_id) REFERENCES generations(id),
 				FOREIGN KEY(type_id) REFERENCES types(id))''')
 
-logd("- Created moves table")
+logd(" - Created moves table")
 
 c.execute('''CREATE TABLE IF NOT EXISTS pokemon_moves (
 				pokemon_id			INTEGER NOT NULL,
@@ -354,6 +376,15 @@ c.execute('''CREATE TABLE IF NOT EXISTS pokemon_moves (
 				FOREIGN KEY(version_group_id) REFERENCES version_groups(id),
 				FOREIGN KEY(move_id) REFERENCES moves(id))''')
 logd(" - Created pokemon_moves")
+
+c.execute('''CREATE TABLE IF NOT EXISTS move_effect_prose (
+				move_effect_id		INTEGER NOT NULL,
+				local_language_id	INTEGER NOT NULL,
+				short_effect		TEXT,
+				effect				TEXT,
+				FOREIGN KEY(local_language_id) REFERENCES languages(id),
+				PRIMARY KEY(move_effect_id, local_language_id))''')
+logd(" - Created move_effect_prose")
 
 
 ####################################################################################################
@@ -378,6 +409,32 @@ def fill_table(table_name, field_names, file_name):
             c.execute(f"INSERT INTO {table_name} {str(field_names)}  VALUES {qmarks}", row)
     logd(f" - Filled {table_name} table")
 
+def replace_func(match):
+    link = match.group(2)
+    if len(match.group(1)) > 0:
+        text = match.group(1)
+    else:
+        text = match.group(3)
+    return f"<a href=\"{link}\">{text}</a>"
+
+def link(string):
+    pattern = r"\[(.*?)\]{(.*?\:(.*?))}"
+    return re.sub(pattern, replace_func, string)
+
+def link_row(table_name, field_names):
+    if len(field_names) == 1:
+        fields = field_names[0]
+    else:
+        fields = ""
+        for field in field_names:
+            fields += field + ", "
+        fields = fields[:-2]
+    c.execute(f"SELECT rowid, {fields} FROM {table_name}")
+    for row in c.fetchall():
+        for field in field_names:
+             c.execute(f"UPDATE {table_name} SET {field}=? WHERE rowid=?", (link(row[field]), row["rowid"]))
+    logd(f" - Added links in fields {str(fields)} in {table_name}")
+
 fill_table("languages", ("id", "iso639", "iso3166", "identifier", "official", "order"), "languages.csv")
 fill_table("regions", ("id", "identifier"), "regions.csv")
 fill_table("region_names", ("region_id", "local_language_id", "name"), "region_names.csv")
@@ -389,6 +446,8 @@ fill_table("type_names", ("type_id", "local_language_id", "name"), "type_names.c
 fill_table("pokedexes", ("id", "region_id", "identifier", "is_main_series"), "pokedexes.csv")
 fill_table("pokemon_colors", ("id", "identifier"), "pokemon_colors.csv")
 fill_table("pokemon_color_names", ("pokemon_color_id", "local_language_id", "name"), "pokemon_color_names.csv")
+fill_table("items", ("id", "identifier", "category_id", "cost", "fling_power", "fling_effect_id"), "items.csv")
+fill_table("item_names", ("item_id", "local_language_id", "name"), "item_names.csv")
 
 fill_table("evolution_chains", ("id", "baby_trigger_item_id"), "evolution_chains.csv")
 fill_table("pokemon_species", ("id", "identifier", "generation_id", "evolves_from_species_id", "evolution_chain_id", "color_id","shape_id","habitat_id", "gender_rate", "capture_rate", "base_happiness", "is_baby", "hatch_counter", "has_gender_differences", "growth_rate_id", "forms_switchable", "order", "conquest_order"), "pokemon_species.csv")
@@ -407,6 +466,9 @@ fill_table("pokemon_move_method_prose", ("pokemon_move_method_id", "local_langua
 fill_table("move_names", ("move_id", "local_language_id", "name"), "move_names.csv")
 fill_table("moves", ("id", "identifier", "generation_id", "type_id", "power", "pp", "accuracy", "priority", "target_id", "damage_class_id", "effect_id", "effect_chance", "contest_type_id", "contest_effect_id", "super_contest_effect_id"), "moves.csv")
 fill_table("pokemon_moves", ("pokemon_id", "version_group_id", "move_id", "pokemon_move_method_id", "level", "order"), "pokemon_moves.csv")
+fill_table("move_effect_prose", ("move_effect_id", "local_language_id", "short_effect", "effect"), "move_effect_prose.csv")
+logd("Adding links...")
+link_row("move_effect_prose", ("short_effect", "effect"))
 logd("Done")
 con.commit()
 con.close()
